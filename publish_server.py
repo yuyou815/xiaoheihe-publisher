@@ -40,7 +40,17 @@ def file_hash(path: Path) -> str:
     return hashlib.md5(path.read_bytes()).hexdigest()
 
 
+async def remove_mask(page):
+    """移除可能拦截点击的遮罩层（如 #t_mask / .t-mask）。"""
+    await page.evaluate("""
+        () => {
+            document.querySelectorAll('#t_mask, .t-mask, [class*="mask"]').forEach(e => e.remove());
+        }
+    """)
+
+
 async def click_text(page, text, timeout=5000):
+    await remove_mask(page)
     el = await page.query_selector(f"text={text}")
     if not el:
         print(f"[未找到] {text}")
@@ -55,22 +65,30 @@ async def click_text(page, text, timeout=5000):
 
 async def fill_editor(page, title, body):
     """在当前页面定位标题框/正文框并覆盖填充。返回 (ok_title, ok_body)。"""
+    await remove_mask(page)
     editables = await page.query_selector_all("[contenteditable]")
     if len(editables) < 2:
         print(f"[错误] 未找到标题/正文输入框（当前 {len(editables)} 个）url={page.url}")
         return False, False
     title_box, body_box = editables[0], editables[1]
 
+    # 用 insert_text 一次性插入（避免逐字符输入在含英文点号文本上重复插入）
     await title_box.click()
     await page.keyboard.press("Control+a")
-    await page.keyboard.type(title, delay=5)
+    await page.keyboard.insert_text(title)
     await body_box.click()
     await page.keyboard.press("Control+a")
-    await page.keyboard.type(body, delay=2)
+    await page.keyboard.insert_text(body)
     return True, True
 
 
 async def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--new", action="store_true",
+                    help="新建草稿（默认打开草稿箱最新草稿）")
+    args = ap.parse_args()
+
     title0, body0 = parse_md(ARTICLE_FILE)
     h0 = file_hash(ARTICLE_FILE)
     print(f"[文章] 标题: {title0}")
@@ -87,16 +105,39 @@ async def main():
         )
         page = ctx.pages[0] if ctx.pages else await ctx.new_page()
 
-        # 进入编辑器：首页 -> 发布内容 -> 发布文章
+        # 进入编辑器：--new 时新建草稿；否则优先打开草稿箱中已保存的草稿
         await page.goto("https://xiaoheihe.cn", timeout=30000, wait_until="domcontentloaded")
         await page.wait_for_timeout(8000)
         if not await click_text(page, "发布内容"):
             print("[错误] 未找到『发布内容』按钮，可能未登录。请先运行 python login_helper.py")
             await ctx.close()
             return
-        await page.wait_for_timeout(8000)
-        await click_text(page, "发布文章")
-        await page.wait_for_timeout(3000)
+        await page.wait_for_timeout(6000)
+
+        opened_draft = False
+        if not args.new and await click_text(page, "草稿箱"):
+            # 等待草稿列表渲染（article 条目出现）
+            try:
+                await page.wait_for_selector("article", timeout=12000)
+                await page.wait_for_timeout(1000)
+            except Exception as e:
+                print(f"[草稿列表等待失败] {e}")
+            # 点击第一个草稿条目（article 元素）
+            draft_item = await page.query_selector("article")
+            if draft_item:
+                try:
+                    await draft_item.click(timeout=6000)
+                    opened_draft = True
+                    print("[草稿箱] 已打开最新草稿")
+                except Exception as e:
+                    print(f"[草稿箱点击失败] {e}")
+            else:
+                print("[草稿箱] 未找到草稿条目")
+            await page.wait_for_timeout(8000)
+
+        if not opened_draft:
+            await click_text(page, "发布文章")
+            await page.wait_for_timeout(3000)
         print(f"[编辑器] {page.url}")
 
         ok_t, ok_b = await fill_editor(page, title0, body0)

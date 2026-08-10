@@ -24,9 +24,17 @@ def port_open(port, timeout=2):
 
 
 def main():
-    # 先清掉可能残留的 Edge 进程（普通模式占住 profile 会导致调试参数被忽略）
-    subprocess.run(["taskkill", "/IM", "msedge.exe", "/F"],
-                   capture_output=True)
+    # 仅清理使用调试 profile（edge_auto）的 Edge，不影响用户日常 Edge
+    ps = subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "Get-CimInstance Win32_Process -Filter \"Name='msedge.exe'\" | "
+         "Where-Object { $_.CommandLine -match 'edge_auto' } | "
+         "ForEach-Object { $_.ProcessId }"],
+        capture_output=True, text=True, timeout=20,
+    )
+    pids = [int(x.strip()) for x in ps.stdout.split() if x.strip().isdigit()]
+    for pid in pids:
+        subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True)
     time.sleep(2)
 
     cmd = [EDGE, f"--remote-debugging-port={PORT}"]

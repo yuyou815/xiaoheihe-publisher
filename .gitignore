@@ -17,3 +17,6 @@ Thumbs.db
 Desktop.ini
 xiaoheihe-publisher.zip
 xiaoheihe_article.md
+server.log
+server_err.log
+start_server.bat

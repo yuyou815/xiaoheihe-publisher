@@ -39,8 +39,9 @@ python -u publish_server.py
 | 脚本 | 作用 |
 |---|---|
 | `config.py` | 集中配置（Edge 路径、profile 目录、CDP 端口），可用环境变量覆盖 |
-| `setup_debug_profile.py` | 复制系统 Edge 登录态到调试 profile 并以调试模式启动 |
+| `setup_debug_profile.py` | 复制系统 Edge 登录态到调试 profile 并以调试模式启动（不影响日常 Edge） |
 | `login_helper.py` | 引导扫码登录，登录态保存在调试 profile |
+| `manage_server.py` | **服务管理器**：以独立进程运行/停止/查看发布服务（推荐方式） |
 | `publish_server.py` | 常驻服务：填充 + 监听文章文件变化原地更新 |
 | `publish_to_xiaoheihe.py` | 一键启动填充；`--update` 模式附加到已打开浏览器原地重填 |
 
@@ -54,11 +55,22 @@ python -u publish_server.py
 这里是正文，支持 markdown 语法（## 小标题、- 列表、> 引用、**加粗**）。
 ```
 
+### 服务管理（推荐）
+
+服务以独立进程运行（通过系统任务计划程序启动），不受终端/对话生命周期影响；
+停止时只清理调试 profile 的 Edge，**不会影响你日常使用的 Edge**。
+
+```bash
+python manage_server.py start [--new]   # 启动（--new 新建草稿，默认打开草稿箱草稿）
+python manage_server.py status           # 查看状态与日志
+python manage_server.py stop             # 停止服务
+```
+
 ### 原地更新（不重开浏览器）
 
 ```bash
 # 方式一：常驻服务（推荐，自动监听文件变化）
-python -u publish_server.py
+python manage_server.py start
 
 # 方式二：单次更新（附加到已打开的浏览器）
 python publish_to_xiaoheihe.py --update

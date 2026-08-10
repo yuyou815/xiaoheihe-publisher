@@ -56,10 +56,44 @@ def copy_login_state():
     return True
 
 
+def kill_edge_debug_profile():
+    """仅结束使用调试 profile（edge_auto）的 Edge 进程，不影响用户日常 Edge。"""
+    ps = subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "Get-CimInstance Win32_Process -Filter \"Name='msedge.exe'\" | "
+         "Where-Object { $_.CommandLine -match 'edge_auto' } | "
+         "ForEach-Object { $_.ProcessId }"],
+        capture_output=True, text=True, timeout=20,
+    )
+    pids = [int(x.strip()) for x in ps.stdout.split() if x.strip().isdigit()]
+    for pid in pids:
+        subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True)
+    if pids:
+        print(f"[清理] 已结束调试 profile 的 Edge 进程: {pids}")
+
+
+def check_default_edge_locked():
+    """检测用户日常 Edge 是否在运行（复制其登录态前需要其关闭）。"""
+    ps = subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "(Get-CimInstance Win32_Process -Filter \"Name='msedge.exe'\").Count"],
+        capture_output=True, text=True, timeout=20,
+    )
+    n = ps.stdout.strip()
+    if n.isdigit() and int(n) > 0:
+        print("[提示] 检测到你的 Edge 正在运行。")
+        print("       复制默认 profile 登录态需要 Edge 已退出（文件被占用）。")
+        print("       请手动关闭 Edge 后重新运行本脚本。")
+        return True
+    return False
+
+
 def main():
-    # 1. 关闭所有 Edge（锁文件问题 + 确保调试参数生效）
-    subprocess.run(["taskkill", "/IM", "msedge.exe", "/F"], capture_output=True)
-    time.sleep(2)
+    # 1. 仅清理调试 profile 的 Edge；复制用户默认 profile 前提示用户手动关闭 Edge
+    kill_edge_debug_profile()
+    time.sleep(1)
+    if check_default_edge_locked():
+        return 1
 
     # 2. 复制登录态到调试 profile
     if not copy_login_state():
