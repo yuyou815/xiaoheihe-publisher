@@ -66,6 +66,27 @@ python publish_to_xiaoheihe.py --update
 
 修改 `xiaoheihe_article.md` 后，编辑器会自动重填（服务模式），或手动运行 `--update`。
 
+### 用 AI Agent 实现自动化
+
+这套脚本适合由 AI Agent（如 Claude、GitHub Copilot、Reasonix 等）编排调用，形成「AI 撰写文章 → 脚本自动填充 → 人工确认发布」的自动化流水线：
+
+1. **AI 生成内容**：AI Agent 将文章写入 `xiaoheihe_article.md`（第一行 `# ` 为标题，其余为正文）
+2. **首次登录**：运行 `python login_helper.py`，用户扫码登录一次，登录态存入调试 profile
+3. **启动服务**：运行 `python -u publish_server.py`，浏览器自动打开小黑盒编辑器并填充内容
+4. **持续修改**：AI 每次改写 `xiaoheihe_article.md`，常驻服务检测到变化后**在原编辑器标签页原地重填**，无需重新登录、不会新建草稿
+5. **人工发布**：内容就绪后由用户在浏览器中点击「发布」（脚本刻意不自动点击，避免误发）
+
+典型 AI Agent 对话式用法：
+
+```text
+用户：帮我把文章发到小黑盒
+AI：  1. 已生成文章内容到 xiaoheihe_article.md
+      2. 正在启动浏览器并打开小黑盒编辑器…
+      3. 内容已填充，请检查后点击「发布」
+```
+
+> 提示：AI Agent 调用脚本前，请先确认调试 profile 已登录（运行过一次 `login_helper.py`）；否则会提示「未找到『发布内容』按钮」。
+
 ## 原理说明
 
 - 新版 Chromium/Edge 在未指定 `--user-data-dir` 时会**禁用 remote debugging**，因此必须使用独立 profile
