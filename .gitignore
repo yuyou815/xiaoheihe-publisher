@@ -1,0 +1,19 @@
+# 工具/缓存
+.reasonix/
+__pycache__/
+*.pyc
+*.pyo
+
+# 环境与本地
+.env
+.venv/
+venv/
+
+# 文章内容（示例可保留，如不需要可取消注释）
+# xiaoheihe_article.md
+
+# 系统文件
+Thumbs.db
+Desktop.ini
+xiaoheihe-publisher.zip
+xiaoheihe_article.md
